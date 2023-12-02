@@ -1,6 +1,6 @@
 #+TITLE: Trebuchet?! The program
 
-* Условие задачи
+* Задача. Ч1.
 [[https://adventofcode.com/2023/day/1][Ссылка на задачу]]
 
 Something is wrong with global snow production, and you've been
@@ -49,7 +49,7 @@ Consider your entire calibration document. What is the sum of all of the calibra
 
 [[file:inputs/1/input][Файл с входными данными]]
 
-* Решение
+** Решение
 #+begin_src scheme :noweb yes :padline yes
   <<прочитать файл>>
   <<рассчитать сумму чисел>>
@@ -58,7 +58,7 @@ Consider your entire calibration document. What is the sum of all of the calibra
 
 Программа состоит из трех основных частей. Чтение файла и печать
 результата — обслуживающий код, основная работа же производится в
-блоке "рассчитать сумму чисел". 
+блоке "рассчитать сумму чисел".
 
 Нам нужно прочитать каждую строку в  файле и извлечь из нее число.
 #+begin_src scheme :noweb yes :noweb-ref рассчитать сумму чисел
@@ -82,20 +82,26 @@ Consider your entire calibration document. What is the sum of all of the calibra
 сделать в Racket -- я сходу не придумал.
 #+end_quote
 
-#+begin_src scheme :noweb-ref рассчитать сумму чисел
+#+caption: рассчитать сумму чисел
+#+begin_src scheme :noweb-ref рассчитать сумму чисел :noweb yes
   (define (read-number-from-line line)
-    (let* ([digits (for/list 
-                         ([c (in-string line)] #:when (char-numeric? c))
-                       (string c))]
+    (let* ([digits (extract-digits-from-line line)]
            [first-digit (car digits)]
            [last-digit (last digits)]
            )
-    (string->number 
+    (string->number
      (string-append first-digit last-digit))))
+
+  (define (extract-digits-from-line line)
+    (for/list
+        ([c (in-string line)] #:when (char-numeric? c))
+      (string c)))
 #+end_src
 
-#+name: прочитать файл
-#+begin_src scheme
+IO-операции здесь тривиальны и не представляют особого
+интереса. Тут мы обошлись чтением файла и функцией печати строки.
+
+#+begin_src scheme :noweb-ref прочитать файл
   (define (calculate-correction-value)
     (call-with-input-file "./inputs/1/input"
       find-sum))
