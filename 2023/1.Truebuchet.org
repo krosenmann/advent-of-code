@@ -111,3 +111,84 @@ IO-операции здесь тривиальны и не представля
 #+begin_src scheme :results output
   (displayln (calculate-correction-value))
 #+end_src
+
+* Часть 2. Условие
+Your calculation isn't quite right. It looks like some of the digits are actually spelled out with letters: one, two, three, four, five, six, seven, eight, and nine also count as valid "digits".
+
+Equipped with this new information, you now need to find the real first and last digit on each line. For example:
+
+#+begin_example
+two1nine
+eightwothree
+abcone2threexyz
+xtwone3four
+4nineeightseven2
+zoneight234
+7pqrstsixteen
+#+end_example
+
+In this example, the calibration values are 29, 83, 13, 24, 42, 14, and 76. Adding these together produces 281.
+
+What is the sum of all of the calibration values?
+
+** Решение.
+Как ни странно, но структура программы практически не меняется.
+Единственное изменение касается функции извлечения цифр из
+строки. Во-первых, для перевода строки в число нам понадобится таблица
+для трансляции словесных числительных в цифры. Во-вторых, если в
+предыдущей версии мы проходили строку посимвольно, то в данном случае
+нам необходимо воспользоваться поиском по подстроке.
+
+Возьмем для этого регулярные выражения. Не будем заморачиваться с
+попытками запихнуть поиск обоих чисел в одну регулярку, а просто
+напишем две: обычный поиск числительного, тогда нам вернется
+первое вхождение, и та же регулярка, но с модификатором ~$~, который
+вернет последнее вхождение числительного.
+
+#+begin_quote
+На этом куске я подзавис, когда решал, потому что пытался построить
+одну регулярку, чтобы распарсить все возможные числительные. Частный
+пример превентивной оптимизации -- и явная ошибка. При том, что дизайн
+программы явно указывает, что извлекать первое и последнее число нужно
+по-одному.
+
+Во-многом, к правильному решению я вернулся как раз за счет дизайна,
+вспомнив о разветвлении в структуре программы, сохранившимся с первой
+версии задачи.
+#+end_quote
+
+#+begin_src scheme :noweb-ref рассчитать сумму чисел
+  (define translation-table
+    (make-hash
+     '(("one" . "1")
+     ("two" . "2")
+     ("three" . "3")
+     ("four" . "4")
+     ("five" . "5")
+     ("six" . "6")
+     ("seven" . "7")
+     ("eight" . "8")
+     ("nine" . "9")
+     ("zero" . "0"))
+     ))
+
+  (define digits
+    "one|two|three|four|five|six|seven|eight|nine|zero|\\d")
+
+  (define digits-re (pregexp digits))
+
+  (define last-digit-re
+    ;; Пассаж с вопросительным знаком группирует все символы вплоть до последнего вхождения.
+    ;; Это позволяет извлечь самое крайнее числительное в ряду.
+    (pregexp (string-append "(?s:.*)(" digits ")")))
+
+  (define (transform-digit digit-str)
+    (if (char-numeric? (string-ref digit-str 0))
+        digit-str
+        (hash-ref translation-table digit-str)))
+
+  (define (extract-digits-from-line line)
+    (map transform-digit (list
+     (car (regexp-match digits-re line))         ; Первая цифра
+     (last (regexp-match last-digit-re line)))))   ; Вторая цифра
+#+end_src
