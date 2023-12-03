@@ -1,0 +1,181 @@
+#+options: ':nil *:t -:t ::t <:t H:3 \n:nil ^:t arch:headline
+#+options: author:t broken-links:nil c:nil creator:nil
+#+options: d:(not "LOGBOOK") date:t e:t email:nil f:t inline:t num:t
+#+options: p:nil pri:nil prop:nil stat:t tags:t tasks:t tex:t
+#+options: timestamp:t title:t toc:t todo:t |:t
+#+title: 2.Cube Conundrum: The Program
+#+date: <2023-12-02 Сб>
+#+author: Roman Zayrullin
+#+language: ru
+#+select_tags: export
+#+exclude_tags: noexport
+#+creator: Emacs 29.1 (Org mode 9.6.6)
+#+cite_export:
+
+* Часть 1.
+** Условие
+[[Https://adventofcode.com/2023/day/2][Ссылка на задачу]]
+
+You're launched high into the atmosphere! The apex of your trajectory just barely reaches the surface of a large island floating in the sky. You gently land in a fluffy pile of leaves. It's quite cold, but you don't see much snow. An Elf runs over to greet you.
+
+The Elf explains that you've arrived at Snow Island and apologizes for the lack of snow. He'll be happy to explain the situation, but it's a bit of a walk, so you have some time. They don't get many visitors up here; would you like to play a game in the meantime?
+
+As you walk, the Elf shows you a small bag and some cubes which are either red, green, or blue. Each time you play this game, he will hide a secret number of cubes of each color in the bag, and your goal is to figure out information about the number of cubes.
+
+To get information, once a bag has been loaded with cubes, the Elf will reach into the bag, grab a handful of random cubes, show them to you, and then put them back in the bag. He'll do this a few times per game.
+
+You play several games and record the information from each game (your puzzle input). Each game is listed with its ID number (like the 11 in Game 11: ...) followed by a semicolon-separated list of subsets of cubes that were revealed from the bag (like 3 red, 5 green, 4 blue).
+
+For example, the record of a few games might look like this:
+
+#+begin_example
+Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green
+#+end_example
+
+In game 1, three sets of cubes are revealed from the bag (and then put back again). The first set is 3 blue cubes and 4 red cubes; the second set is 1 red cube, 2 green cubes, and 6 blue cubes; the third set is only 2 green cubes.
+
+The Elf would first like to know which games would have been possible if the bag contained only 12 red cubes, 13 green cubes, and 14 blue cubes?
+
+In the example above, games 1, 2, and 5 would have been possible if the bag had been loaded with that configuration. However, game 3 would have been impossible because at one point the Elf showed you 20 red cubes at once; similarly, game 4 would also have been impossible because the Elf showed you 15 blue cubes at once. If you add up the IDs of the games that would have been possible, you get 8.
+
+Determine which games would have been possible if the bag had been
+loaded with only 12 red cubes, 13 green cubes, and 14 blue cubes. What
+is the sum of the IDs of those games?
+
+** Решение
+
+Для начала зафисируем признак валидной игры. 
+
+Сохраним максимальные количества кубов в хеш таблице, чтобы можно было
+по цвету взять масимум. И функцию, которая принимает на вход пару
+"цвет, количество" и отвечает, не превышает ли пара заданное
+ограничение.
+
+#+begin_src scheme
+  (define maximum-amount 
+    (make-hash
+     '(("red" . 12)
+       ("green" . 13)
+       ("blue" . 14))))
+
+  (define (correct-move? move)
+    (let ([color (car move)]
+          [amount (cdr move)])
+      (>= (hash-ref maximum-amount color) amount)))
+#+end_src
+
+Так же нам понадобится функция, которая из строки строит множество игр, как
+список пар.
+
+Структура кубов и ходов вложенная, поэтому зададим себе
+функции-хелперы, которые помогут распарсить отдельные подобъекты в
+каждой строке. 
+#+begin_quote
+По какой-то причине флаг =#:trim?= у =string-split= не работает должным
+образом -- значения не триммятся. Разбираться мне с этим лень,
+поэтому вызываю trim отдельно.
+#+end_quote
+
+#+begin_src scheme
+  (define (parse-moves str-moves)
+    (let ([moves (map string-trim (string-split str-moves ";"))]
+          [split-move (lambda (move) (map string-trim (string-split move ",")))]
+          [parse-cube (lambda (cubes) (map string-trim (string-split cubes " ")))])
+      (for/list ([move (in-list (map split-move moves))])
+        (map 
+         (lambda (mv)
+           (cons (last mv)                                   ; color
+                 (string->number (car mv)))) ; value
+         (map parse-cube move)))))
+#+end_src
+
+Игру мы считаем валидной только в том случае, если валидны все "ходы" эльфа в
+течении игры.
+#+begin_src scheme
+  (define (correct-game? game)
+    (andmap 
+     (lambda (move) (andmap correct-move? move)) game))
+#+end_src
+
+Теперь осталось добавить функцию фильтрации, которая вернет нам ID
+всех валидных игр.
+
+#+begin_src scheme
+  (define (get-id str)
+    (let* ([title (car (string-split str ":"))]
+           [id (string-trim (last (string-split title " ")))])
+      (string->number id)))
+
+  (define (find-valid-games file)
+     (for/sum ([game (in-lines file)]
+              #:when  (correct-game? (parse-moves 
+                                     (last (string-split game ":")))))
+       (get-id game)))
+#+end_src
+
+Теперь откроем файл и попробуем скормить его нашей программе
+#+begin_src scheme
+  (call-with-input-file "./inputs/2/input"
+        find-valid-games)
+#+end_src
+
+* Часть 2.
+** Условие
+The Elf says they've stopped producing snow because they aren't getting any water! He isn't sure why the water stopped; however, he can show you how to get to the water source to check it out for yourself. It's just up ahead!
+
+As you continue your walk, the Elf poses a second question: in each game you played, what is the fewest number of cubes of each color that could have been in the bag to make the game possible?
+
+Again consider the example games from earlier:
+
+#+begin_example
+Game 1: 3 blue, 4 red; 1 red, 2 green, 6 blue; 2 green
+Game 2: 1 blue, 2 green; 3 green, 4 blue, 1 red; 1 green, 1 blue
+Game 3: 8 green, 6 blue, 20 red; 5 blue, 4 red, 13 green; 5 green, 1 red
+Game 4: 1 green, 3 red, 6 blue; 3 green, 6 red; 3 green, 15 blue, 14 red
+Game 5: 6 red, 1 blue, 3 green; 2 blue, 1 red, 2 green
+#+end_example
+
+- In game 1, the game could have been played with as few as 4 red, 2 green, and 6 blue cubes. If any color had even one fewer cube, the game would have been impossible.
+- Game 2 could have been played with a minimum of 1 red, 3 green, and 4 blue cubes.
+- Game 3 must have been played with at least 20 red, 13 green, and 6 blue cubes.
+- Game 4 required at least 14 red, 3 green, and 15 blue cubes.
+- Game 5 needed no fewer than 6 red, 3 green, and 2 blue cubes in the bag.
+
+The power of a set of cubes is equal to the numbers of red, green, and blue cubes multiplied together. The power of the minimum set of cubes in game 1 is 48. In games 2-5 it was 12, 1560, 630, and 36, respectively. Adding up these five powers produces the sum 2286.
+
+For each game, find the minimum set of cubes that must have been
+present. What is the sum of the power of these sets?
+
+** Решение
+Чтобы решить эту задачу, нам понадобятся дополнительные
+функции. Нужно рассчитать минимально возможное число кубов,
+выбрав максимальные выпавшие значения в игре, и перемножить эти числа.
+
+Чтобы получить минимальное возможное число кубов, создадим три
+контейнера, в которые сложим количества кубов одного цвета на каждом
+из ходов, найдем максимальные и перемножим полученные значения
+(перемножение требуется по условию).
+#+begin_src scheme
+  (define (get-minimax game)
+    (let ([green '(0)]
+          [red '(0)]
+          [blue '(0)])
+      (for* ([move (in-list game)]
+             [cube (in-list move)])
+        (match (car cube)
+          ["red" (set! red (cons (cdr cube) red))]
+          ["green" (set! green (cons (cdr cube) green))]
+          ["blue" (set! blue (cons (cdr cube) blue))]))
+      (apply * (map 
+                (lambda (number) (argmax (lambda (x) x) number))
+                (list red green blue)))))
+
+
+  (define (find-valid-games file)
+     (for/sum ([game (in-lines file)])
+       (get-minimax (parse-moves (last (string-split game ":"))))))
+#+end_src
